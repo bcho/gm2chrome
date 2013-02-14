@@ -1,0 +1,4 @@
+# gm2chrome
+
+A simple script for converting [Grease Monkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)
+script to [Chrome content script extension](http://developer.chrome.com/extensions/content_scripts.html).
