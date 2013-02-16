@@ -8,6 +8,7 @@ import urllib
 import json
 
 EXTENSION_PATH = os.path.abspath('ext/')
+GRANT_SCRIPT_PATH = os.path.abspath('gm2chrome')
 
 
 def get_remote_scripts(scripts):
@@ -26,7 +27,8 @@ def get_remote_scripts(scripts):
 
 
 def get_grant_scripts(scripts):
-    return ['grant%s.js' % script for script in scripts]
+    return [os.path.join(GRANT_SCRIPT_PATH,
+            'grant%s.js') % script for script in scripts]
 
 
 def parse_manifest(lines):
