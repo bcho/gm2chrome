@@ -79,7 +79,8 @@ def main():
             shutil.move('manifest.json', EXTENSION_PATH)
             for scope in manifest['content_scripts']:
                 for script in scope['js']:
-                    if script == sys.argv[1] or script.startswith('grant'):
+                    if script == sys.argv[1] or \
+                        os.path.split(script)[-1].startswith('grant'):
                         shutil.copy(script, EXTENSION_PATH)
                     else:
                         shutil.move(script, EXTENSION_PATH)
