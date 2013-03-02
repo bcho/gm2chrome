@@ -27,8 +27,7 @@ def get_remote_scripts(scripts):
 
 
 def get_grant_scripts(scripts):
-    return [os.path.join(GRANT_SCRIPT_PATH,
-            'grant%s.js') % script for script in scripts]
+    return ['grant%s.js' % script for script in scripts]
 
 
 def parse_manifest(lines):
@@ -79,9 +78,11 @@ def main():
             shutil.move('manifest.json', EXTENSION_PATH)
             for scope in manifest['content_scripts']:
                 for script in scope['js']:
-                    if script == sys.argv[1] or \
-                        os.path.split(script)[-1].startswith('grant'):
+                    if script == sys.argv[1]:
                         shutil.copy(script, EXTENSION_PATH)
+                    elif script.startswith('grant'):
+                        shutil.copy(os.path.join(GRANT_SCRIPT_PATH, script),
+                                EXTENSION_PATH)
                     else:
                         shutil.move(script, EXTENSION_PATH)
     else:
