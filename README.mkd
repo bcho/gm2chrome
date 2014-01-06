@@ -2,3 +2,33 @@
 
 A simple script for converting [Grease Monkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/)
 script to [Chrome content script extension](http://developer.chrome.com/extensions/content_scripts.html).
+
+
+## Example
+
+```console
+$ ls
+cool-gm-script.js
+
+$ python3 conveter.py cool-gm-script.js cool-gm-script
+Convert finished!
+
+$ ls cool-gm-script
+cool-gm-script.js jquery-2.0.3.min.js manifest.json
+```
+
+## How It Works
+
+This script will parse the grease monkey script's [metadata block](http://wiki.greasespot.net/Metadata_Block),
+and map them into Chrome [extension's manifest defination](http://developer.chrome.com/extensions/content_scripts.html#registration).
+
+It will also retrieve the remote scripts that [require](http://wiki.greasespot.net/Metadata_Block#.40require) by the script.
+
+In order to mock some [API](http://wiki.greasespot.net/API_Reference) that grease monkey provided, you can refer to [grantGM_xmlhttpRequest.js](grantGm_xmlhttpRequest.js).
+
+
+## Contribution
+
+:shipit:
+
+Contribution is welcome, feel free to open an issue and fork. Waiting for your pull request <3
