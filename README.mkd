@@ -24,7 +24,7 @@ and map them into Chrome [extension's manifest defination](http://developer.chro
 
 It will also retrieve the remote scripts that [require](http://wiki.greasespot.net/Metadata_Block#.40require) by the script.
 
-In order to mock some [API](http://wiki.greasespot.net/API_Reference) that grease monkey provided, you can refer to [grantGM_xmlhttpRequest.js](grantGm_xmlhttpRequest.js).
+In order to mock some [API](http://wiki.greasespot.net/API_Reference) that grease monkey provided, you can refer to [grantGM_xmlhttpRequest.js](grantGM_xmlhttpRequest.js).
 
 
 ## Contribution
