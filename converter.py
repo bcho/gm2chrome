@@ -1,94 +1,186 @@
+#!/usr/bin/env python3
 #coding: utf-8
 
-import re
-import sys
+'''Usage: python converter.py SOURCE_SCRIPT OUTPUT_DESTINATION
+Convert your grease monkey script into chrome content script extension.
+'''
+
 import os
 import shutil
-import urllib
+import re
 import json
-
-EXTENSION_PATH = os.path.abspath('ext/')
-GRANT_SCRIPT_PATH = os.path.abspath('gm2chrome')
-
-
-def get_remote_scripts(scripts):
-    ret, is_remote_script = [], re.compile(r'http[s]{0,1}://.*/(.*\.js)')
-    for script in scripts:
-        m = is_remote_script.match(script)
-        if m:
-            f = urllib.urlopen(script)
-            with open(m.groups()[0], 'w') as s:
-                s.write(f.read())
-            f.close()
-            ret.append(m.groups()[0])
-        else:
-            ret.append(script)
-    return ret
+from urllib import request
+from collections import defaultdict
 
 
-def get_grant_scripts(scripts):
-    return ['grant%s.js' % script for script in scripts]
+def parse_metadata(raw):
+    '''Parse script meta data into dict.
 
+    e.g.,:
 
-def parse_manifest(lines):
-    manifest, r = {}, re.compile(r'//\s*@(\w+)\s*(.*)')
+        // ==UserScript==
+        // @name           hello world
+        // @namespace      http://foobar.example.com
+        // @version        3.1.4
+        // @description    This is a test description.
+        // @match          http://a.example.com
+        // @grant          GM_getValue
+        // @grant          GM_setValue
+        // ==/UserScript==
+
+    should be parsed into:
+
+        {
+            'name': u'hello world',
+            'namespace': u'http://foobar.example.com',
+            'version': u'3.1.4',
+            'description': u'This is a test description.',
+            'match': u'http://a.example.com',
+            'grant': [u'GM_getValue', u'GM_setValue']
+        }
+
+    :param raw: unparsed metadata
+    '''
+    BEGIN = re.compile('==UserScript==', re.IGNORECASE)
+    END = re.compile('==/UserScript==', re.IGNORECASE)
+    KV = re.compile('//\s*@(\w+)\s*(.+)')
+    LIST_KEYS = ['require', 'grant']
+
+    lines = END.split(BEGIN.split(raw)[-1])[0].split('\n')
+    _parsed, parsed = defaultdict(list), {}
+
     for line in lines:
-        g = r.match(line)
-        if g:
-            if not manifest.get(g.groups()[0], None):
-                manifest[g.groups()[0]] = [g.groups()[1].strip()]
-            else:
-                manifest[g.groups()[0]].append(g.groups()[1].strip())
-    return manifest
+        line = line.strip()
+        if not line.startswith('//'):
+            continue
+        check = KV.match(line)
+        if check:
+            k, v = check.group(1).strip().lower(), check.group(2).strip()
+            _parsed[k].append(v)
+
+    for k, v in _parsed.items():
+        if len(v) > 1 or k in LIST_KEYS:
+            parsed[k] = [i for i in v]
+        else:
+            # flatten the value if there is no duplicated key
+            parsed[k] = v[0]
+
+    return parsed
 
 
-def build_ext_manifest(manifest, script):
-    return {
+def get_remote_script(script_dest):
+    '''Retrieve remote script's name and content
+
+    :param script_dest: remote script's url
+    '''
+    check = re.compile('http[s]{0,1}://.*/(.*\.js)').match(script_dest)
+    if not check:
+        return
+    name = check.group(1)
+    with request.urlopen(script_dest) as remote:
+        return (name, str(remote.read()))
+
+
+def get_grant_script(api, name_tmpl=None, scripts_path=None):
+    '''Retrieve local grant api script's name and content.
+
+    If requested grant api script not found, raise `Exception`
+
+    :param api: grant api's name
+    :param name_tmpl: grant api scripts name template,
+                      default is `'grant%s.js'`
+    :param scripts_path: grant api scripts path,
+                         default is current directory
+    '''
+    name_tmpl = name_tmpl or 'grant%s.js'
+    scripts_path = scripts_path or os.path.dirname(os.path.abspath(__file__))
+
+    name = name_tmpl % api
+    path = os.path.join(scripts_path, name)
+    if not os.path.exists(path):
+        raise Exception('Grant api script %s not found! (%s)' % (api, path))
+    with open(path, 'r') as grant_script:
+        return (name, grant_script.read())
+
+
+def build_manifest(metadata, script_name):
+    '''Build chrome extension's manifest and scripts from metadata.
+
+    :param metadata: parsed metadata from `parse_metadata`
+    :param script_name: script's name
+    '''
+    remote_scripts = dict(map(get_remote_script, metadata.get('require', [])))
+    grant_scripts = dict(map(get_grant_script, metadata.get('grant', [])))
+    scripts = list(remote_scripts.keys()) + list(grant_scripts.keys())
+    
+    manifest = {
         'manifest_version': 2,
-        'name': manifest['name'][0],
-        'description': manifest['description'][0],
-        'version': manifest['version'][0],
-
+        'name': metadata['name'],
+        'description': metadata['description'],
+        'version': metadata['version'],
         'content_scripts': [{
-            'matches': manifest['match'],
-            'js': get_remote_scripts(manifest.get('require', [])) +
-                  get_grant_scripts(manifest.get('grant', [])) +
-                  [script],
+            'matches': metadata['match'],
+            'js': scripts + [script_name],
             'run_at': 'document_end',
             'all_frames': True
         }],
-
-        'permissions': manifest['match']
+        'permissions': metadata['match']
     }
 
+    return manifest, remote_scripts, grant_scripts
 
-def main():
-    if len(sys.argv) > 1:
-        with open(sys.argv[1], 'r') as f:
-            gm_manifest = parse_manifest(f.readlines())
-            manifest = build_ext_manifest(gm_manifest, sys.argv[1])
-            with open('manifest.json', 'w') as chrome_manifest:
-                chrome_manifest.write(json.dumps(manifest))
-            
-            try:
-                shutil.rmtree(EXTENSION_PATH)
-            except:
-                pass
-            os.mkdir(EXTENSION_PATH)
-            shutil.move('manifest.json', EXTENSION_PATH)
-            for scope in manifest['content_scripts']:
-                for script in scope['js']:
-                    if script == sys.argv[1]:
-                        shutil.copy(script, EXTENSION_PATH)
-                    elif script.startswith('grant'):
-                        shutil.copy(os.path.join(GRANT_SCRIPT_PATH, script),
-                                EXTENSION_PATH)
-                    else:
-                        shutil.move(script, EXTENSION_PATH)
-    else:
-        print 'python %s your_script.js' % sys.argv[0]
+
+def create_ext_path(dest_path, manifest, scripts):
+    '''Create converted extension path tree.
+
+    :param dest_path: output path
+    :param manifest: converted manifest dict
+    :param scripts: scripts list, item as (name, content) tuple
+    '''
+
+    def write(name, content):
+        with open(os.path.join(dest_path, name), 'w') as f:
+            f.write(content)
+
+    try:
+        shutil.rmtree(dest_path)
+    except:
+        pass
+    os.mkdir(dest_path)
+
+    write('manifest.json', json.dumps(manifest, indent=4))
+    for name, content in scripts:
+        write(name, content)
+
+
+def convert(source_path, dest_path):
+    '''Convert a grease monkey script into Chrome extension
+    content script.
     
+    :param source_path: source script path
+    :param dest_path: output path
+    '''
+    source_path = os.path.abspath(source_path)
+    with open(source_path, 'r') as source:
+        script = (os.path.basename(source_path), source.read())
+
+    name, content = script
+    metadata = parse_metadata(content)
+    manifest, remote, grant = build_manifest(metadata, name)
+    scripts = list(remote.items()) + list(grant.items()) + [script]
+
+    create_ext_path(dest_path, manifest, scripts)
+
+
+def _cli():
+    import sys
+    if len(sys.argv) > 2:
+        source, dest = sys.argv[-2:]
+        convert(source, dest)
+        print('Convert finished!', end='')
+    else:
+        print(__doc__)
 
 
 if __name__ == '__main__':
-    main()
+    _cli()
