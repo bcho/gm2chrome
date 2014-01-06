@@ -179,7 +179,7 @@ def _cli():
         convert(source, dest)
         print('Convert finished!', end='')
     else:
-        print(__doc__)
+        print(__doc__, end='')
 
 
 if __name__ == '__main__':
