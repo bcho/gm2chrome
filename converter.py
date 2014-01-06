@@ -78,7 +78,7 @@ def get_remote_script(script_dest):
         return
     name = check.group(1)
     with request.urlopen(script_dest) as remote:
-        return (name, str(remote.read()))
+        return (name, remote.read().decode('utf-8'))
 
 
 def get_grant_script(api, name_tmpl=None, scripts_path=None):
