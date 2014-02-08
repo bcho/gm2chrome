@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 #coding: utf-8
 
-'''Usage: python converter.py SOURCE_SCRIPT OUTPUT_DESTINATION
+'''Usage:
+    python converter.py SOURCE_SCRIPT [PREDEFINED_MANIFEST] OUTPUT_DESTINATION
+
 Convert your grease monkey script into chrome content script extension.
 '''
 
@@ -169,6 +171,10 @@ def build_manifest(metadata, script_name, predefined_manifest=None):
 
     if predefined_manifest:
         manifest = merge_keys(manifest, predefined_manifest)
+        # Also copy extra keys
+        for k, v in predefined_manifest.items():
+            if k not in manifest:
+                manifest[k] = v
 
     return manifest, remote_scripts, grant_scripts
 

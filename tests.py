@@ -81,7 +81,7 @@ class TestParsing(unittest.TestCase):
         manifest, remote, grant = build_manifest(metadata, '1.js')
 
         # Merge list.
-        self.assertTrue('activeTab' in manifest['permissions'])
+        self.assertIn('activeTab', manifest['permissions'])
 
         # Metadata block should have higher priority.
         self.assertEqual(3, int(manifest['manifest_version']))
@@ -109,10 +109,13 @@ class TestParsing(unittest.TestCase):
         manifest, remote, grant = build_manifest(metadata, '1.js', predefined)
 
         # Merge list.
-        self.assertTrue('activeTab' in manifest['permissions'])
+        self.assertIn('activeTab', manifest['permissions'])
 
         # Predefined manifest should have higher priority.
         self.assertEqual(1, int(manifest['manifest_version']))
+
+        # Has extra keys:
+        self.assertIn('background', manifest)
 
 
 if __name__ == '__main__':
