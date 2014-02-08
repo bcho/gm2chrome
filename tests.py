@@ -73,7 +73,6 @@ class TestParsing(unittest.TestCase):
         // @description    This is a test description.
         // @match          http://a.example.com
         // @grant          GM_xmlhttpRequest
-        // @require        http://code.jquery.com/jquery-2.0.3.min.js
         // @permissions    activeTab
         // @manifest_version 3
         // ==/UserScript==
@@ -86,6 +85,34 @@ class TestParsing(unittest.TestCase):
 
         # Metadata block should have higher priority.
         self.assertEqual(3, int(manifest['manifest_version']))
+
+    def testPredefinedManifest(self):
+        raw = '''
+        // ==UserScript==
+        // @name           hello world
+        // @namespace      http://foobar.example.com
+        // @version        3.1.4
+        // @description    This is a test description.
+        // @match          http://a.example.com
+        // @grant          GM_xmlhttpRequest
+        // @permissions    activeTab
+        // @manifest_version 3
+        // ==/UserScript==
+        '''
+
+        predefined = {
+            'manifest_version': 1,
+            'background': {}
+        }
+
+        metadata = parse_metadata(raw)
+        manifest, remote, grant = build_manifest(metadata, '1.js', predefined)
+
+        # Merge list.
+        self.assertTrue('activeTab' in manifest['permissions'])
+
+        # Predefined manifest should have higher priority.
+        self.assertEqual(1, int(manifest['manifest_version']))
 
 
 if __name__ == '__main__':

@@ -68,20 +68,20 @@ def parse_metadata(raw):
     return parsed
 
 
-def merge_keys(manifest, metadata):
-    '''Merge named keys in metadata block into manifest.
+def merge_keys(lower, higher):
+    '''Merge named keys from two dict.
 
-    :param manifest: manifest dict
-    :param metadata: metadata block dict
+    :param lower: lower priority dict
+    :param higher: higher priority dict
     '''
-    for k, meta_v in metadata.items():
-        is_list_meta_v = isinstance(meta_v, list)
+    for k, higher_v in higher.items():
+        is_list_higher_v = isinstance(higher_v, list)
 
         # Only merge some declared keys.
         # Maybe it's ok to mantain a list of allowed manifest keywords.
-        if k in manifest:
-            mani_v = manifest[k]
-            is_list_mani_v = isinstance(mani_v, list)
+        if k in lower:
+            lower_v = lower[k]
+            is_list_lower_v = isinstance(lower_v, list)
 
             # The strategic used here is a bit tricky:
             # the value from the metadata block has higher priority
@@ -93,16 +93,16 @@ def merge_keys(manifest, metadata):
             # in the metadata block, but we can also specify some permissions
             # like `activeTab` in the metadata block. So we should include all
             # of them. (By merging them into a new list.)
-            if is_list_meta_v and is_list_mani_v:
-                manifest[k] = meta_v + mani_v
-            elif is_list_meta_v:
-                manifest[k] = meta_v + [mani_v]
-            elif is_list_mani_v:
-                manifest[k] = [meta_v] + mani_v
+            if is_list_higher_v and is_list_lower_v:
+                lower[k] = higher_v + lower_v
+            elif is_list_higher_v:
+                lower[k] = higher_v + [lower_v]
+            elif is_list_lower_v:
+                lower[k] = [higher_v] + lower_v
             else:
-                manifest[k] = meta_v
+                lower[k] = higher_v
 
-    return manifest
+    return lower
 
 
 def get_remote_script(script_dest):
@@ -140,11 +140,12 @@ def get_grant_script(api, name_tmpl=None, scripts_path=None):
         return (name, grant_script.read())
 
 
-def build_manifest(metadata, script_name):
+def build_manifest(metadata, script_name, predefined_manifest=None):
     '''Build chrome extension's manifest and scripts from metadata.
 
     :param metadata: parsed metadata from `parse_metadata`
     :param script_name: script's name
+    :param predefined_manifest: predefined manifest
     '''
     remote_scripts = dict(map(get_remote_script, metadata.get('require', [])))
     grant_scripts = dict(map(get_grant_script, metadata.get('grant', [])))
@@ -165,6 +166,9 @@ def build_manifest(metadata, script_name):
         'permissions': metadata['match']
     }
     manifest = merge_keys(manifest, metadata)
+
+    if predefined_manifest:
+        manifest = merge_keys(manifest, predefined_manifest)
 
     return manifest, remote_scripts, grant_scripts
 
@@ -192,12 +196,13 @@ def create_ext_path(dest_path, manifest, scripts):
         write(name, content)
 
 
-def convert(source_path, dest_path):
+def convert(source_path, dest_path, predefined_manifest=None):
     '''Convert a grease monkey script into Chrome extension
     content script.
 
     :param source_path: source script path
     :param dest_path: output path
+    :param predefined_manifest: predefined manifest
     '''
     source_path = os.path.abspath(source_path)
     with open(source_path, 'r') as source:
@@ -205,7 +210,8 @@ def convert(source_path, dest_path):
 
     name, content = script
     metadata = parse_metadata(content)
-    manifest, remote, grant = build_manifest(metadata, name)
+    manifest, remote, grant = build_manifest(metadata, name,
+                                             predefined_manifest)
     scripts = list(remote.items()) + list(grant.items()) + [script]
 
     create_ext_path(dest_path, manifest, scripts)
@@ -213,9 +219,16 @@ def convert(source_path, dest_path):
 
 def _cli():
     import sys
-    if len(sys.argv) > 2:
-        source, dest = sys.argv[-2:]
-        convert(source, dest)
+    argvl = len(sys.argv)
+    if argvl > 2:
+        if argvl == 3:
+            source, dest = sys.argv[-2:]
+            manifest = None
+        elif argvl == 4:
+            source, manifest_file, dest = sys.argv[-3:]
+            with open(manifest_file, 'r') as f:
+                manifest = json.loads(f.read())
+        convert(source, dest, manifest)
         print('Convert finished!', end='')
     else:
         print(__doc__, end='')
