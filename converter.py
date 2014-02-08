@@ -68,6 +68,43 @@ def parse_metadata(raw):
     return parsed
 
 
+def merge_keys(manifest, metadata):
+    '''Merge named keys in metadata block into manifest.
+
+    :param manifest: manifest dict
+    :param metadata: metadata block dict
+    '''
+    for k, meta_v in metadata.items():
+        is_list_meta_v = isinstance(meta_v, list)
+
+        # Only merge some declared keys.
+        # Maybe it's ok to mantain a list of allowed manifest keywords.
+        if k in manifest:
+            mani_v = manifest[k]
+            is_list_mani_v = isinstance(mani_v, list)
+
+            # The strategic used here is a bit tricky:
+            # the value from the metadata block has higher priority
+            # to the manifest one. But if any one of them is a list,
+            # we merge them.
+            #
+            # Consider this example:
+            # `permissions` in the manifest should contain all `match` urls
+            # in the metadata block, but we can also specify some permissions
+            # like `activeTab` in the metadata block. So we should include all
+            # of them. (By merging them into a new list.)
+            if is_list_meta_v and is_list_mani_v:
+                manifest[k] = meta_v + mani_v
+            elif is_list_meta_v:
+                manifest[k] = meta_v + [mani_v]
+            elif is_list_mani_v:
+                manifest[k] = [meta_v] + mani_v
+            else:
+                manifest[k] = meta_v
+
+    return manifest
+
+
 def get_remote_script(script_dest):
     '''Retrieve remote script's name and content
 
@@ -112,7 +149,8 @@ def build_manifest(metadata, script_name):
     remote_scripts = dict(map(get_remote_script, metadata.get('require', [])))
     grant_scripts = dict(map(get_grant_script, metadata.get('grant', [])))
     scripts = list(remote_scripts.keys()) + list(grant_scripts.keys())
-    
+
+    # Base manifest
     manifest = {
         'manifest_version': 2,
         'name': metadata['name'],
@@ -126,6 +164,7 @@ def build_manifest(metadata, script_name):
         }],
         'permissions': metadata['match']
     }
+    manifest = merge_keys(manifest, metadata)
 
     return manifest, remote_scripts, grant_scripts
 
@@ -156,7 +195,7 @@ def create_ext_path(dest_path, manifest, scripts):
 def convert(source_path, dest_path):
     '''Convert a grease monkey script into Chrome extension
     content script.
-    
+
     :param source_path: source script path
     :param dest_path: output path
     '''
