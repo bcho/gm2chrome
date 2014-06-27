@@ -1,4 +1,4 @@
-#coding: utf-8
+# coding: utf-8
 
 import unittest
 
@@ -63,6 +63,27 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(len(manifest['content_scripts']), 1)
         self.assertIn('jquery-2.0.3.min.js', remote)
         self.assertIn('grantGM_xmlhttpRequest.js', grant)
+
+    def testRemoteSciprtsOrder(self):
+        raw = '''
+        // ==UserScript==
+        // @name           hello world
+        // @namespace      http://foobar.example.com
+        // @version        3.1.4
+        // @description    This is a test description.
+        // @match          http://a.example.com
+        // @require http://code.jquery.com/jquery-2.0.3.min.js
+        // @require http://code.jquery.com/jquery-2.1.1.min.js
+        // @require http://code.jquery.com/jquery-2.0.0.min.js
+        // ==/UserScript==
+        '''
+        metadata = parse_metadata(raw)
+        manifest, remote, grant = build_manifest(metadata, '1.js')
+        scripts = manifest['content_scripts'][0]['js']
+        self.assertIsInstance(scripts, list)
+        self.assertEqual(scripts[0], 'jquery-2.0.3.min.js')
+        self.assertEqual(scripts[1], 'jquery-2.1.1.min.js')
+        self.assertEqual(scripts[2], 'jquery-2.0.0.min.js')
 
     def testMergeKey(self):
         raw = '''

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#coding: utf-8
+# coding: utf-8
 
 '''Usage:
     python converter.py SOURCE_SCRIPT [PREDEFINED_MANIFEST] OUTPUT_DESTINATION
@@ -12,7 +12,7 @@ import shutil
 import re
 import json
 from urllib import request
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 
 def parse_metadata(raw):
@@ -149,7 +149,10 @@ def build_manifest(metadata, script_name, predefined_manifest=None):
     :param script_name: script's name
     :param predefined_manifest: predefined manifest
     '''
-    remote_scripts = dict(map(get_remote_script, metadata.get('require', [])))
+    remote_scripts = OrderedDict()
+    for remote_script in metadata.get('require', []):
+        name, content = get_remote_script(remote_script)
+        remote_scripts[name] = content
     grant_scripts = dict(map(get_grant_script, metadata.get('grant', [])))
     scripts = list(remote_scripts.keys()) + list(grant_scripts.keys())
 
